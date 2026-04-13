@@ -1,0 +1,55 @@
+{
+  "name": "flight-data-viz",
+  "version": "0.0.1",
+  "description": "tbd",
+  "main": "build/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "NODE_ENV=production node --env-file-if-exists=./.env ./dist/server/server.js",
+    "dev": "NODE_ENV=development tsx watch --tsconfig ./tsconfig.server.json --env-file-if-exists=./.env ./server/server.ts",
+    "build:client": "tsc -b tsconfig.client.json && vite build --config client/vite.config.ts",
+    "build:server": "tsc -b tsconfig.server.json",
+    "build": "npm run build:server && npm run build:client",
+    "typecheck": "tsc -p ./tsconfig.server.json --noEmit && tsc -p ./tsconfig.client.json --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "lint:ast-grep": "appkit lint",
+    "format": "prettier --check .",
+    "format:fix": "prettier --write .",
+    "test": "vitest run",
+    "clean": "rm -rf client/dist dist build node_modules",
+    "postinstall": "npm run typegen",
+    "prebuild": "npm run sync && npm run typegen",
+    "predev": "npm run sync && npm run typegen",
+    "sync": "appkit plugin sync --write --silent",
+    "typegen": "appkit generate-types",
+    "setup": "appkit setup --write"
+  },
+  "dependencies": {
+    "@databricks/appkit": "^0.19.1",
+    "@databricks/appkit-ui": "^0.19.1",
+    "@databricks/sdk-experimental": "^0.14.2",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/node": "^24.6.0",
+    "@types/react": "^19.1.16",
+    "@types/react-dom": "^19.1.9",
+    "@vitejs/plugin-react": "^5.0.4",
+    "eslint": "^9.39.1",
+    "prettier": "^3.6.2",
+    "tailwindcss": "^4.0.14",
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.3",
+    "vite": "npm:rolldown-vite@7.1.14",
+    "vitest": "^4.0.14"
+  },
+  "overrides": {
+    "vite": "npm:rolldown-vite@7.1.14"
+  },
+  "author": "Atila Fassina",
+  "license": "Apache-2.0"
+}
