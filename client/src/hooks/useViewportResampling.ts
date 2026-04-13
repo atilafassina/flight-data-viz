@@ -34,11 +34,23 @@ interface CachedResult {
   entityId: string;
   startTime: number;
   endTime: number;
+  targetPoints: number;
   data: ParameterData[];
 }
 
-function isWithinCache(cache: CachedResult, entityId: string, startMs: number, endMs: number): boolean {
-  return cache.entityId === entityId && startMs >= cache.startTime && endMs <= cache.endTime;
+function isWithinCache(
+  cache: CachedResult,
+  entityId: string,
+  startMs: number,
+  endMs: number,
+  targetPoints: number
+): boolean {
+  return (
+    cache.entityId === entityId &&
+    cache.targetPoints === targetPoints &&
+    startMs >= cache.startTime &&
+    endMs <= cache.endTime
+  );
 }
 
 function filterToViewport(data: ParameterData[], startMs: number, endMs: number): ParameterData[] {
@@ -78,7 +90,7 @@ export function useViewportResampling({
 
     // Cache hit — serve locally, no loading state
     const cached = cacheRef.current;
-    if (cached && isWithinCache(cached, entityId, startMs, endMs)) {
+    if (cached && isWithinCache(cached, entityId, startMs, endMs, targetPoints)) {
       setData(filterToViewport(cached.data, startMs, endMs));
       setLoading(false);
       return;
@@ -115,6 +127,7 @@ export function useViewportResampling({
 
         cacheRef.current = {
           entityId,
+          targetPoints,
           startTime: startMs,
           endTime: endMs,
           data: result.data,

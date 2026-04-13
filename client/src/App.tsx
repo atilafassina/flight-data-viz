@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { FlightTimeSeries } from './components/FlightTimeSeries';
+import { FlightScatterPlot } from './components/FlightScatterPlot';
 import { FlightSelector } from './components/FlightSelector';
 import { DangerZone } from './components/DangerZone';
 import { useViewportResampling } from './hooks/useViewportResampling';
 
 const PARAMETERS = ['altitude', 'speed', 'oil_pressure', 'battery_voltage', 'in_air'];
+
+type ViewMode = 'timeseries' | 'scatter';
 
 function Clock() {
   const [time, setTime] = useState(new Date());
@@ -23,12 +26,14 @@ function Clock() {
 export default function App() {
   const [selectedFlight, setSelectedFlight] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<{ start: string; end: string } | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('timeseries');
 
   const { data, loading, error } = useViewportResampling({
     entityId: selectedFlight,
     parameters: PARAMETERS,
     startTime: timeRange?.start ?? null,
     endTime: timeRange?.end ?? null,
+    targetPoints: viewMode === 'scatter' ? 100_000 : 3000,
   });
 
   const handleFlightSelect = (entityId: string, startTime: string, endTime: string) => {
@@ -62,14 +67,40 @@ export default function App() {
         <div className="space-y-3">
           {/* Chart header */}
           <div className="flex items-center justify-between">
-            <div className="flex items-baseline gap-2">
-              <span className="text-xs uppercase tracking-wider text-zinc-500">Primary Display</span>
-              {selectedFlight && (
-                <>
-                  <span className="text-zinc-700">/</span>
-                  <span className="text-xs font-medium text-emerald-400">{selectedFlight}</span>
-                </>
-              )}
+            <div className="flex items-center gap-4">
+              <div className="flex items-baseline gap-2">
+                <span className="text-xs uppercase tracking-wider text-zinc-500">Primary Display</span>
+                {selectedFlight && (
+                  <>
+                    <span className="text-zinc-700">/</span>
+                    <span className="text-xs font-medium text-emerald-400">{selectedFlight}</span>
+                  </>
+                )}
+              </div>
+
+              {/* View toggle */}
+              <div className="flex rounded border border-zinc-700 font-mono text-xs">
+                <button
+                  onClick={() => setViewMode('timeseries')}
+                  className={`px-2.5 py-1 transition-colors ${
+                    viewMode === 'timeseries'
+                      ? 'bg-emerald-500/15 text-emerald-400'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  Time Series
+                </button>
+                <button
+                  onClick={() => setViewMode('scatter')}
+                  className={`border-l border-zinc-700 px-2.5 py-1 transition-colors ${
+                    viewMode === 'scatter'
+                      ? 'bg-emerald-500/15 text-emerald-400'
+                      : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  Scatter
+                </button>
+              </div>
             </div>
             {selectedFlight && timeRange && (
               <span className="text-xs tabular-nums text-zinc-600">
@@ -81,7 +112,11 @@ export default function App() {
           </div>
 
           {/* Chart */}
-          <FlightTimeSeries data={data} loading={loading} error={error} />
+          {viewMode === 'timeseries' ? (
+            <FlightTimeSeries data={data} loading={loading} error={error} />
+          ) : (
+            <FlightScatterPlot data={data} loading={loading} error={error} />
+          )}
         </div>
       </div>
 
