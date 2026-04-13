@@ -1,0 +1,46 @@
+@import 'tailwindcss';
+@import '@databricks/appkit-ui/styles.css';
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root {
+  --hud-green: #34d399;
+  --hud-green-dim: #059669;
+  --hud-amber: #fbbf24;
+  --hud-red: #f87171;
+  --hud-bg: #0a0a0a;
+  --hud-panel: #111111;
+  --hud-border: #1f2937;
+  --hud-border-bright: #374151;
+  --hud-text: #d1d5db;
+  --hud-text-dim: #6b7280;
+  --hud-glow: 0 0 20px rgba(52, 211, 153, 0.08);
+}
+
+body {
+  background: var(--hud-bg);
+  color: var(--hud-text);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* Subtle dot grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(52, 211, 153, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Override plotly modebar to match theme */
+.js-plotly-plot .modebar {
+  background: transparent !important;
+}
+.js-plotly-plot .modebar-btn path {
+  fill: var(--hud-text-dim) !important;
+}
+.js-plotly-plot .modebar-btn:hover path {
+  fill: var(--hud-green) !important;
+}

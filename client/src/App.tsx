@@ -1,0 +1,97 @@
+import { useState, useEffect } from 'react';
+import { FlightTimeSeries } from './components/FlightTimeSeries';
+import { FlightSelector } from './components/FlightSelector';
+import { DangerZone } from './components/DangerZone';
+import { useViewportResampling } from './hooks/useViewportResampling';
+
+const PARAMETERS = ['altitude', 'speed', 'oil_pressure', 'battery_voltage', 'in_air'];
+
+function Clock() {
+  const [time, setTime] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <span className="tabular-nums text-emerald-500/70">
+      {time.toISOString().slice(11, 19)}
+      <span className="text-emerald-500/30">Z</span>
+    </span>
+  );
+}
+
+export default function App() {
+  const [selectedFlight, setSelectedFlight] = useState<string | null>(null);
+  const [timeRange, setTimeRange] = useState<{ start: string; end: string } | null>(null);
+
+  const { data, loading, error } = useViewportResampling({
+    entityId: selectedFlight,
+    parameters: PARAMETERS,
+    startTime: timeRange?.start ?? null,
+    endTime: timeRange?.end ?? null,
+  });
+
+  const handleFlightSelect = (entityId: string, startTime: string, endTime: string) => {
+    setSelectedFlight(entityId);
+    setTimeRange({ start: startTime, end: endTime });
+  };
+
+  return (
+    <div className="relative min-h-screen p-4">
+      {/* Top bar */}
+      <header className="mb-4 flex items-center justify-between border-b border-zinc-800/80 pb-3">
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-sm font-semibold uppercase tracking-widest text-emerald-400">
+            Flight Data Viz
+          </h1>
+          <span className="text-xs text-zinc-600">AppKit Resample Engine</span>
+        </div>
+        <div className="flex items-center gap-6 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+            <span className="text-zinc-500">CONNECTED</span>
+          </div>
+          <Clock />
+        </div>
+      </header>
+
+      {/* Main layout */}
+      <div className="grid grid-cols-[280px_1fr] gap-4">
+        <FlightSelector onSelect={handleFlightSelect} selectedFlight={selectedFlight} />
+
+        <div className="space-y-3">
+          {/* Chart header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-baseline gap-2">
+              <span className="text-xs uppercase tracking-wider text-zinc-500">Primary Display</span>
+              {selectedFlight && (
+                <>
+                  <span className="text-zinc-700">/</span>
+                  <span className="text-xs font-medium text-emerald-400">{selectedFlight}</span>
+                </>
+              )}
+            </div>
+            {selectedFlight && timeRange && (
+              <span className="text-xs tabular-nums text-zinc-600">
+                {new Date(timeRange.start).toISOString().slice(11, 19)}
+                <span className="text-zinc-700"> — </span>
+                {new Date(timeRange.end).toISOString().slice(11, 19)}
+              </span>
+            )}
+          </div>
+
+          {/* Chart */}
+          <FlightTimeSeries data={data} loading={loading} error={error} />
+        </div>
+      </div>
+
+      {/* Dev-only danger zone, aligned to the plot column */}
+      {import.meta.env.DEV && (
+        <div className="grid grid-cols-[280px_1fr] gap-4">
+          <div />
+          <DangerZone />
+        </div>
+      )}
+    </div>
+  );
+}
