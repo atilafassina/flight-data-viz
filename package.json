@@ -24,6 +24,7 @@
     "prebuild": "npm run sync && npm run typegen",
     "predev": "npm run sync && npm run typegen",
     "sync": "appkit plugin sync --write --silent",
+    "deploy:sync": "databricks sync . /Workspace/Users/atila.fassina@databricks.com/.bundle/flight-viz-v2/default/files",
     "typegen": "appkit generate-types",
     "setup": "appkit setup --write"
   },
