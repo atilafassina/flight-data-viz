@@ -1,0 +1,34 @@
+bundle:
+  name: flight-viz
+
+resources:
+  apps:
+    app:
+      name: 'flight-viz'
+      description: 'Flight data visualization with server-side downsampling'
+      source_code_path: ./
+      user_api_scopes:
+        - sql
+        - files.files
+      resources:
+        - name: sql-warehouse
+          sql_warehouse:
+            id: ${var.warehouse_id}
+            permission: CAN_USE
+        - name: postgres
+          postgres:
+            permission: CAN_CONNECT_AND_CREATE
+            # add your own values here
+            branch: projects/<project_name>/branches/<branch_name>
+            database: projects/flight-viz/branches/production/databases/<database_name>
+variables:
+  warehouse_id:
+    description: 'SQL Warehouse ID for query execution'
+    default: '<warehouse_id>'
+
+targets:
+  default:
+    default: true
+    workspace:
+      # add your own value here
+      host: <host_url>

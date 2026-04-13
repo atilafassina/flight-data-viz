@@ -1,1 +1,8 @@
 command: ['npm', 'run', 'start']
+env:
+  - name: LAKEBASE_ENDPOINT
+    valueFrom: postgres
+  - name: DATABRICKS_WAREHOUSE_ID
+    valueFrom: sql-warehouse
+  - name: DATABRICKS_VOLUME_FILES
+    value: /Volumes/main/default/flight_viz_cache
