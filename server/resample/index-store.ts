@@ -71,7 +71,12 @@ export class IndexStore {
       `INSERT INTO ${this.table}
         (entity_id, parameter, start_time, end_time, chunk_path, point_count, created_by, expires_at)
        VALUES ${placeholders.map((p) => p.replace(/\)$/, `, '${expiresAt.toISOString()}')`)).join(', ')}
-       ON CONFLICT (entity_id, parameter, start_time, end_time) DO NOTHING`,
+       ON CONFLICT (entity_id, parameter, start_time, end_time) DO UPDATE SET
+         chunk_path = EXCLUDED.chunk_path,
+         point_count = EXCLUDED.point_count,
+         created_by = EXCLUDED.created_by,
+         created_at = NOW(),
+         expires_at = EXCLUDED.expires_at`,
       values
     );
 
@@ -181,6 +186,7 @@ export class IndexStore {
       `SELECT start_time, end_time
        FROM ${this.table}
        WHERE entity_id = $1 AND parameter = $2
+         AND expires_at > NOW()
          AND (${conditions.join(' OR ')})`,
       values
     );
