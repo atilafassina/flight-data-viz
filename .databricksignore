@@ -1,10 +1,11 @@
 node_modules/
-package-lock.json
 .env
 .git/
-dist/
-client/dist/
 test-results/
 playwright-report/
 .smoke-test/
 *.tsbuildinfo
+
+# Override .gitignore — include built output for deployment
+!dist/
+!client/dist/
