@@ -1,25 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { IndexStore, chunkDedupKey } from './index-store.js';
-import type { Pool, QueryResult } from 'pg';
+import { IndexStore, chunkDedupKey, type QueryablePool } from './index-store.js';
+import type { QueryResult } from 'pg';
 
-function createMockPool(queryFn?: (text: string, values?: unknown[]) => QueryResult) {
+function createMockPool(queryFn?: (text: string, values?: unknown[]) => QueryResult): QueryablePool {
   const defaultQueryFn = () => ({ rows: [], rowCount: 0, command: '', oid: 0, fields: [] });
   return {
     query: vi.fn().mockImplementation(queryFn ?? defaultQueryFn),
-    end: vi.fn(),
-  } as unknown as Pool;
+  };
 }
 
 /** Extract mock calls from the pool.query mock */
-function getMockCalls(pool: Pool): [string, unknown[]?][] {
-  return vi.mocked(pool.query).mock.calls as unknown as [string, unknown[]?][];
+function getMockCalls(pool: QueryablePool): [string, unknown[]?][] {
+  return vi.mocked(pool.query).mock.calls.map((call) => [call[0] as string, call[1] as unknown[] | undefined]);
 }
 
 const INDEX_CONFIG = { schema: 'resample', tableName: 'resample_chunks' };
 const TTL_SECONDS = 86400;
 
 describe('IndexStore', () => {
-  let pool: Pool;
+  let pool: QueryablePool;
   let store: IndexStore;
 
   beforeEach(() => {
@@ -38,16 +37,37 @@ describe('IndexStore', () => {
   });
 
   describe('createTable', () => {
-    it('creates schema and table with correct SQL', async () => {
+    it('creates schema and table when it does not exist', async () => {
+      pool = createMockPool(((text: string) =>
+        text.includes('pg_tables')
+          ? { rows: [{ exists: false }], rowCount: 1, command: '', oid: 0, fields: [] }
+          : { rows: [], rowCount: 0, command: '', oid: 0, fields: [] }) as never);
+      store = new IndexStore(pool, INDEX_CONFIG, TTL_SECONDS);
+
       await store.createTable();
       const calls = getMockCalls(pool);
 
-      expect(calls).toHaveLength(3);
-      expect(calls[0][0]).toContain('CREATE SCHEMA IF NOT EXISTS resample');
-      expect(calls[1][0]).toContain('CREATE TABLE IF NOT EXISTS resample.resample_chunks');
-      expect(calls[1][0]).toContain('entity_id VARCHAR(255)');
-      expect(calls[1][0]).toContain('UNIQUE (entity_id, parameter, start_time, end_time)');
-      expect(calls[2][0]).toContain('CREATE INDEX IF NOT EXISTS');
+      expect(calls).toHaveLength(4);
+      expect(calls[0][0]).toContain('pg_tables');
+      expect(calls[1][0]).toContain('CREATE SCHEMA IF NOT EXISTS resample');
+      expect(calls[2][0]).toContain('CREATE TABLE IF NOT EXISTS resample.resample_chunks');
+      expect(calls[2][0]).toContain('entity_id VARCHAR(255)');
+      expect(calls[2][0]).toContain('UNIQUE (entity_id, parameter, start_time, end_time)');
+      expect(calls[3][0]).toContain('CREATE INDEX IF NOT EXISTS');
+    });
+
+    it('skips creates when table already exists', async () => {
+      pool = createMockPool(((text: string) =>
+        text.includes('pg_tables')
+          ? { rows: [{ exists: true }], rowCount: 1, command: '', oid: 0, fields: [] }
+          : { rows: [], rowCount: 0, command: '', oid: 0, fields: [] }) as never);
+      store = new IndexStore(pool, INDEX_CONFIG, TTL_SECONDS);
+
+      await store.createTable();
+      const calls = getMockCalls(pool);
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0][0]).toContain('pg_tables');
     });
   });
 
@@ -58,7 +78,7 @@ describe('IndexStore', () => {
       expect(pool.query).not.toHaveBeenCalled();
     });
 
-    it('builds correct INSERT with ON CONFLICT DO NOTHING', async () => {
+    it('builds correct INSERT with ON CONFLICT DO UPDATE to refresh expiry', async () => {
       const chunks = [
         {
           entity_id: 'flight-1',
@@ -78,7 +98,8 @@ describe('IndexStore', () => {
       expect(calls).toHaveLength(1);
       expect(calls[0][0]).toContain('INSERT INTO resample.resample_chunks');
       expect(calls[0][0]).toContain('ON CONFLICT');
-      expect(calls[0][0]).toContain('DO NOTHING');
+      expect(calls[0][0]).toContain('DO UPDATE');
+      expect(calls[0][0]).toContain('expires_at = EXCLUDED.expires_at');
       expect(calls[0][1]).toContain('flight-1');
       expect(calls[0][1]).toContain('altitude');
     });

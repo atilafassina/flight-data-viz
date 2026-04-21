@@ -62,7 +62,7 @@ export async function* ingestParameter(
     format: 'JSON_ARRAY',
   });
 
-  const rows = extractRows(response as unknown as Record<string, unknown>);
+  const rows = extractRows(response);
   if (rows.length === 0) {
     yield { phase: 'done', progress: 1, detail: 'No data found' };
     return;
@@ -164,7 +164,7 @@ export async function* ingestParameter(
 }
 
 /** Extract row data from a SQL Statement Execution API response */
-function extractRows(response: Record<string, unknown>): Record<string, unknown>[] {
+function extractRows(response: unknown): Record<string, unknown>[] {
   const resp = response as {
     result?: {
       data_array?: unknown[][];

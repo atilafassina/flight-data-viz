@@ -1,9 +1,11 @@
 import type { Pool } from 'pg';
 import type { ChunkMeta, EntitySummary, ResampleIndex } from './types.js';
 
+export type QueryablePool = Pick<Pool, 'query'>;
+
 export class IndexStore {
   constructor(
-    private pool: Pool,
+    private pool: QueryablePool,
     private indexConfig: ResampleIndex,
     private ttlSeconds: number
   ) {}
@@ -18,6 +20,14 @@ export class IndexStore {
 
   /** Create the schema and index table if they don't exist */
   async createTable(): Promise<void> {
+    const { rows } = await this.pool.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM pg_tables WHERE schemaname = $1 AND tablename = $2
+       ) AS exists`,
+      [this.indexConfig.schema, this.indexConfig.tableName]
+    );
+    if (rows[0]?.exists) return;
+
     await this.pool.query(`CREATE SCHEMA IF NOT EXISTS ${this.schema}`);
     await this.pool.query(`
       CREATE TABLE IF NOT EXISTS ${this.table} (
