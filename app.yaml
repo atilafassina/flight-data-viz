@@ -1,7 +1,5 @@
 command: ['npm', 'run', 'start']
 env:
-  - name: npm_config_omit
-    value: dev
   - name: LAKEBASE_ENDPOINT
     valueFrom: postgres
   - name: DATABRICKS_WAREHOUSE_ID
