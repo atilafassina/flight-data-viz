@@ -121,10 +121,30 @@ npm test             # Vitest (45 tests) + Playwright smoke
 ## Deployment
 
 ```bash
-databricks bundle validate
-databricks bundle deploy
-databricks bundle run flight-v
+databricks apps deploy
 ```
+
+### First-time Lakebase permissions
+
+Two Lakebase schemas are created the first time you run the app: `resample` (this plugin's chunk index) and `appkit` (AppKit's persistent cache). When you run `npm run dev`, they're created as owned by **your** Postgres user. The deployed app runs as a **service principal**, which has no access to schemas owned by someone else — so startup fails with `permission denied for schema resample` / `permission denied for schema appkit`, and every API call returns empty data.
+
+After the schemas exist (i.e. after you've run `npm run dev` at least once), grant the SP access:
+
+```bash
+npx tsx --tsconfig ./tsconfig.server.json --env-file-if-exists=./.env ./scripts/grant-lakebase-access.ts
+```
+
+This grants PUBLIC (so both you and the SP can use them) USAGE + CREATE on each schema, full CRUD on existing tables and sequences, plus default privileges for anything created later.
+
+One-time — survives re-deploys. Re-run only if you drop and recreate either schema.
+
+### Other deploy gotchas
+
+Things we hit on this project. Leaving them here so they're not re-discovered:
+
+- **`CREATE INDEX IF NOT EXISTS` needs table ownership.** Even when the index already exists, Postgres enforces ownership at parse time. The SP doesn't own your dev-created tables, so the plugin's first-run migrations would throw "must be owner of table". `IndexStore.createTable()` short-circuits when `pg_tables` shows the table already exists, so on re-deploy it's a no-op instead of an error.
+- **TTL dedup vs listing filters.** `findExistingChunks` used to not filter `expires_at > NOW()`, while `listEntities` / `findChunks` did. Result: expired rows silently blocked re-ingest (dedup saw them) but were invisible to the UI (listings filtered them out) — the entity "disappeared" yet never came back no matter how many times you re-ingested. Fix: dedup now also requires `expires_at > NOW()`, and `insertChunks` uses `ON CONFLICT ... DO UPDATE` to refresh expiry on reinsert.
+- **Skip `npm_config_omit=dev` in `app.yaml`.** The Databricks Apps build runs `npm install` *then* `npm run build`. Building needs the devDependencies (`tsdown`, `vite`, `tsc`, `appkit`), so pruning them at install time breaks the build phase.
 
 ## Tech Stack
 
