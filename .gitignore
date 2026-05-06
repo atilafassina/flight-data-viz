@@ -4,6 +4,8 @@ client/dist/
 dist/
 build/
 .env
+.env*
+!.env.example
 .databricks/
 .smoke-test/
 test-results/
