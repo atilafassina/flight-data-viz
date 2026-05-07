@@ -4,5 +4,21 @@ import "@databricks/appkit-ui/react";
 import type { SQLTypeMarker, SQLStringMarker, SQLNumberMarker, SQLBooleanMarker, SQLBinaryMarker, SQLDateMarker, SQLTimestampMarker } from "@databricks/appkit-ui/js";
 
 declare module "@databricks/appkit-ui/react" {
-  interface QueryRegistry {}
+  interface QueryRegistry {
+    flight_parameters: {
+        name: "flight_parameters";
+        parameters: {
+          /** STRING - use sql.string() */
+          entity_id: SQLStringMarker;
+          /** STRING - use sql.string() */
+          parameter: SQLStringMarker;
+        };
+        result: Array<{
+          /** @sqlType TIMESTAMP */
+          timestamp: string;
+          /** @sqlType DOUBLE */
+          value: number;
+        }>;
+      };
+  }
 }

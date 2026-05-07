@@ -62,6 +62,11 @@ export async function* streamResampleQuery(
   const viewportStart = startTime.getTime();
   const viewportEnd = endTime.getTime();
 
+  // Mirror ingest.ts upload-loop concurrency: cap parallel UC Volume downloads
+  // so a wide viewport (24h × N parameters × fine chunks) does not open hundreds
+  // of concurrent HTTP downloads against the volume.
+  const CONCURRENCY = 8;
+
   for (const param of parameters) {
     const paramChunks = chunksByParam.get(param) ?? [];
     if (paramChunks.length === 0) {
@@ -69,29 +74,36 @@ export async function* streamResampleQuery(
       continue;
     }
 
-    // Download and downsample all chunks for this parameter in parallel
-    const chunkResults = await Promise.all(
-      paramChunks.map(async (chunk) => {
-        const fullPath = `${volumePath}${chunk.chunk_path}`;
+    // Download and downsample all chunks for this parameter in batches of CONCURRENCY.
+    // Batch order doesn't matter — the final sort by time restores the canonical ordering.
+    const chunkResults: DownsampledPoint[][] = [];
 
-        // Check cache first
-        let buffer = chunkCache?.get(chunk.chunk_path);
-        if (!buffer) {
-          buffer = await downloadFromVolume(fullPath);
-          chunkCache?.set(chunk.chunk_path, buffer);
-        }
+    for (let batch = 0; batch < paramChunks.length; batch += CONCURRENCY) {
+      const slice = paramChunks.slice(batch, batch + CONCURRENCY);
+      const settled = await Promise.all(
+        slice.map(async (chunk) => {
+          const fullPath = `${volumePath}${chunk.chunk_path}`;
 
-        const chunkTarget = proportionalTargetPoints(
-          chunk.start_time.getTime(),
-          chunk.end_time.getTime(),
-          viewportStart,
-          viewportEnd,
-          targetPoints
-        );
+          // Check cache first
+          let buffer = chunkCache?.get(chunk.chunk_path);
+          if (!buffer) {
+            buffer = await downloadFromVolume(fullPath);
+            chunkCache?.set(chunk.chunk_path, buffer);
+          }
 
-        return downsampleArrowBuffer(buffer, chunkTarget);
-      })
-    );
+          const chunkTarget = proportionalTargetPoints(
+            chunk.start_time.getTime(),
+            chunk.end_time.getTime(),
+            viewportStart,
+            viewportEnd,
+            targetPoints
+          );
+
+          return downsampleArrowBuffer(buffer, chunkTarget);
+        })
+      );
+      chunkResults.push(...settled);
+    }
 
     const allPoints = chunkResults.flat().sort((a, b) => a.time - b.time);
     yield { parameter: param, points: allPoints };

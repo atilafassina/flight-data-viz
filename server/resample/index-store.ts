@@ -3,6 +3,16 @@ import type { ChunkMeta, EntitySummary, ResampleIndex } from './types.js';
 
 export type QueryablePool = Pick<Pool, 'query'>;
 
+/**
+ * Maximum number of chunk rows to insert in a single SQL statement.
+ *
+ * PostgreSQL caps prepared-statement bind parameters at 65,535. With 7 placeholders
+ * per chunk in `insertChunks`, the absolute ceiling is ~9,360 chunks per INSERT;
+ * 5,000 is a comfortable headroom that keeps each batch's parameter count well
+ * under the limit while still amortizing round-trip costs.
+ */
+const BATCH_SIZE = 5000;
+
 export class IndexStore {
   constructor(
     private pool: QueryablePool,
@@ -54,6 +64,23 @@ export class IndexStore {
   async insertChunks(chunks: Omit<ChunkMeta, 'created_at'>[]): Promise<number> {
     if (chunks.length === 0) return 0;
 
+    // Compute expires_at once for the whole call. The trivial drift between batches
+    // (microseconds at this scale) is irrelevant for TTL semantics.
+    const expiresAt = new Date(Date.now() + this.ttlSeconds * 1000);
+
+    let totalRowCount = 0;
+    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+      const slice = chunks.slice(i, i + BATCH_SIZE);
+      totalRowCount += await this.insertChunkBatch(slice, expiresAt);
+    }
+    return totalRowCount;
+  }
+
+  /** Run a single INSERT for up to BATCH_SIZE chunks. Returns the rowCount for this batch. */
+  private async insertChunkBatch(
+    chunks: Omit<ChunkMeta, 'created_at'>[],
+    expiresAt: Date
+  ): Promise<number> {
     const values: unknown[] = [];
     const placeholders: string[] = [];
 
@@ -73,9 +100,6 @@ export class IndexStore {
         c.created_by,
       );
     }
-
-    // expires_at is computed from ttl
-    const expiresAt = new Date(Date.now() + this.ttlSeconds * 1000);
 
     const result = await this.pool.query(
       `INSERT INTO ${this.table}

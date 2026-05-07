@@ -1,9 +1,9 @@
 import { createApp, server, analytics } from '@databricks/appkit';
 import { resample } from './resample/index.js';
 
-await createApp({
+const appkit = await createApp({
   plugins: [
-    server(),
+    server({ autoStart: false }),
     analytics(),
     resample({
       source: {
@@ -15,3 +15,7 @@ await createApp({
     }),
   ],
 });
+
+appkit.resample.setAnalytics(appkit.analytics);
+
+await appkit.server.start();

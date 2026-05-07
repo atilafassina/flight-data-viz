@@ -3,7 +3,7 @@ import { WorkspaceClient } from '@databricks/sdk-experimental';
 let cachedAuth: { host: string; headers: Record<string, string>; expiresAt: number } | null = null;
 
 /** Get auth headers from the SDK's configured credentials (cached for 5 minutes) */
-async function getAuthHeaders(): Promise<{ host: string; headers: Record<string, string> }> {
+export async function getAuthHeaders(): Promise<{ host: string; headers: Record<string, string> }> {
   if (cachedAuth && Date.now() < cachedAuth.expiresAt) {
     return { host: cachedAuth.host, headers: cachedAuth.headers };
   }

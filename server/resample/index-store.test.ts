@@ -135,6 +135,46 @@ describe('IndexStore', () => {
       expect(calls).toHaveLength(1);
       expect(calls[0][1]).toHaveLength(14); // 7 params per chunk * 2 chunks
     });
+
+    it('splits inserts into multiple batches when chunks exceed BATCH_SIZE', async () => {
+      // BATCH_SIZE = 5000 in production. Build 5001 synthetic chunks so the second
+      // batch carries exactly one row, and the rowCounts sum across batches.
+      const total = 5001;
+      const chunks = Array.from({ length: total }, (_, i) => ({
+        entity_id: 'flight-1',
+        parameter: 'altitude',
+        start_time: new Date(Date.UTC(2026, 0, 1, 0, 0, i)),
+        end_time: new Date(Date.UTC(2026, 0, 1, 0, 0, i + 1)),
+        chunk_path: `/flight-1/altitude/${i}.arrow`,
+        point_count: 1,
+        created_by: 'user@test.com',
+        expires_at: new Date('2026-01-02T00:00:00Z'),
+      }));
+
+      // Each call returns rowCount equal to the placeholder set count, so we can
+      // verify the helper sums them correctly.
+      pool = createMockPool(((_text: string, values?: unknown[]) => ({
+        rows: [],
+        rowCount: (values?.length ?? 0) / 7,
+        command: 'INSERT',
+        oid: 0,
+        fields: [],
+      })) as never);
+      store = new IndexStore(pool, INDEX_CONFIG, TTL_SECONDS);
+
+      const result = await store.insertChunks(chunks);
+      const calls = getMockCalls(pool);
+
+      // Two INSERT statements: 5000 + 1
+      expect(calls).toHaveLength(2);
+      expect(calls[0][1]).toHaveLength(5000 * 7);
+      expect(calls[1][1]).toHaveLength(1 * 7);
+      // Both statements still carry the ON CONFLICT clause
+      expect(calls[0][0]).toContain('ON CONFLICT');
+      expect(calls[1][0]).toContain('ON CONFLICT');
+      // Sum of per-batch rowCount is returned
+      expect(result).toBe(total);
+    });
   });
 
   describe('findChunks', () => {

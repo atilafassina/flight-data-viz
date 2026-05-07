@@ -6,6 +6,7 @@ import { resolveConfig } from './types.js';
 import type { ResampleConfig, ResampleConfigInput } from './types.js';
 import { IndexStore } from './index-store.js';
 import { ingestParameter } from './ingest.js';
+import type { AnalyticsHandle } from './ingest.js';
 import { executeResampleQuery, streamResampleQuery } from './query.js';
 import type { QueryRequest } from './query.js';
 import { ChunkCache } from './chunk-cache.js';
@@ -34,6 +35,11 @@ class ResamplePlugin extends Plugin<ResamplePluginConfig> {
   private indexStore: IndexStore | null = null;
   private parsedConfig!: ResampleConfig;
   private chunkCache = new ChunkCache();
+  private analytics: AnalyticsHandle | null = null;
+
+  setAnalytics(analytics: AnalyticsHandle) {
+    this.analytics = analytics;
+  }
 
   async setup() {
     if (!this.config.source) {
@@ -162,6 +168,11 @@ class ResamplePlugin extends Plugin<ResamplePluginConfig> {
         return;
       }
 
+      if (!this.analytics) {
+        res.status(503).json({ error: 'Analytics handle not wired — ingest disabled' });
+        return;
+      }
+
       const { entityId } = req.params;
       const { parameter } = req.body as { parameter?: string };
 
@@ -185,6 +196,7 @@ class ResamplePlugin extends Plugin<ResamplePluginConfig> {
           parameter,
           this.parsedConfig,
           this.indexStore,
+          this.analytics,
           userId,
           this.chunkCache
         );
@@ -210,6 +222,7 @@ class ResamplePlugin extends Plugin<ResamplePluginConfig> {
       getIndexStore: () => this.indexStore,
       getConfig: () => this.parsedConfig,
       getPool: () => this.pool,
+      setAnalytics: (analytics: AnalyticsHandle) => this.setAnalytics(analytics),
     };
   }
 

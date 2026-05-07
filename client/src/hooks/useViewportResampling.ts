@@ -48,16 +48,9 @@ function isWithinCache(
   return (
     cache.entityId === entityId &&
     cache.targetPoints === targetPoints &&
-    startMs >= cache.startTime &&
-    endMs <= cache.endTime
+    cache.startTime === startMs &&
+    cache.endTime === endMs
   );
-}
-
-function filterToViewport(data: ParameterData[], startMs: number, endMs: number): ParameterData[] {
-  return data.map((param) => ({
-    parameter: param.parameter,
-    points: param.points.filter((p) => p.time >= startMs && p.time <= endMs),
-  }));
 }
 
 export function useViewportResampling({
@@ -91,7 +84,7 @@ export function useViewportResampling({
     // Cache hit — serve locally, no loading state
     const cached = cacheRef.current;
     if (cached && isWithinCache(cached, entityId, startMs, endMs, targetPoints)) {
-      setData(filterToViewport(cached.data, startMs, endMs));
+      setData(cached.data);
       setLoading(false);
       return;
     }

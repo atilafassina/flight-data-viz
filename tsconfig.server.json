@@ -12,6 +12,6 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["server/**/*", "shared/**/*", "config/**/*"],
+  "include": ["server/**/*", "shared/**/*", "config/**/*", "scripts/**/*"],
   "exclude": ["node_modules", "dist", "client"]
 }

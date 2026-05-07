@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState, lazy, Suspense } from 'react';
+import { useMemo, useCallback, lazy, Suspense } from 'react';
 import type { Data, Layout, PlotRelayoutEvent } from 'plotly.js';
 import { ChartLoading, ChartEmpty } from './ChartLoading';
 
@@ -55,32 +55,14 @@ function buildTraces(data: ParameterData[]): Data[] {
 }
 
 export function FlightTimeSeries({ data, loading, error, onViewportChange }: FlightTimeSeriesProps) {
-  const [viewport, setViewport] = useState<{ start: number; end: number } | null>(null);
+  const traces = useMemo(() => buildTraces(data), [data]);
 
-  const overviewTraces = useMemo(() => buildTraces(data), [data]);
-
-  const detailData = useMemo(() => {
-    if (!viewport) return data;
-    return data.map((param) => ({
-      ...param,
-      points: param.points.filter((p) => p.time >= viewport.start && p.time <= viewport.end),
-    }));
-  }, [data, viewport]);
-
-  const detailTraces = useMemo(() => buildTraces(detailData), [detailData]);
-
-  const handleOverviewRelayout = useCallback(
+  const handleRelayout = useCallback(
     (event: PlotRelayoutEvent) => {
       const xStart = event['xaxis.range[0]'] as string | undefined;
       const xEnd = event['xaxis.range[1]'] as string | undefined;
-
       if (xStart && xEnd) {
-        const start = new Date(xStart).getTime();
-        const end = new Date(xEnd).getTime();
-        setViewport({ start, end });
-        onViewportChange?.(start, end);
-      } else if (event['xaxis.autorange']) {
-        setViewport(null);
+        onViewportChange?.(new Date(xStart).getTime(), new Date(xEnd).getTime());
       }
     },
     [onViewportChange]
@@ -114,9 +96,6 @@ export function FlightTimeSeries({ data, loading, error, onViewportChange }: Fli
         title: { text: '' },
         type: 'date',
         ...DARK_AXIS,
-        ...(viewport
-          ? { range: [new Date(viewport.start).toISOString(), new Date(viewport.end).toISOString()] }
-          : {}),
       },
       yaxis: { title: { text: '' }, side: 'left', ...DARK_AXIS },
       yaxis2: {
@@ -135,7 +114,7 @@ export function FlightTimeSeries({ data, loading, error, onViewportChange }: Fli
       hovermode: 'x unified' as const,
       hoverlabel: HOVER_LABEL,
     }),
-    [viewport]
+    []
   );
 
   if (loading) {
@@ -163,23 +142,24 @@ export function FlightTimeSeries({ data, loading, error, onViewportChange }: Fli
         {/* Overview chart with range slider */}
         <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
           <Plot
-            data={overviewTraces}
+            data={traces}
             layout={overviewLayout}
             useResizeHandler
             style={{ width: '100%' }}
             config={{ responsive: true, displayModeBar: false }}
-            onRelayout={handleOverviewRelayout}
+            onRelayout={handleRelayout}
           />
         </div>
 
         {/* Detail chart */}
         <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-2">
           <Plot
-            data={detailTraces}
+            data={traces}
             layout={detailLayout}
             useResizeHandler
             style={{ width: '100%' }}
             config={{ responsive: true, displayModeBar: true, displaylogo: false }}
+            onRelayout={handleRelayout}
           />
         </div>
       </div>

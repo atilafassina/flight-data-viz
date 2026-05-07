@@ -4,6 +4,7 @@ import { FlightScatterPlot } from './components/FlightScatterPlot';
 import { FlightSelector } from './components/FlightSelector';
 import { DangerZone } from './components/DangerZone';
 import { useViewportResampling } from './hooks/useViewportResampling';
+import { useDebouncedValue } from './hooks/useDebouncedValue';
 
 const PARAMETERS = ['altitude', 'speed', 'oil_pressure', 'battery_voltage', 'in_air'];
 
@@ -26,7 +27,22 @@ function Clock() {
 export default function App() {
   const [selectedFlight, setSelectedFlight] = useState<string | null>(null);
   const [timeRange, setTimeRange] = useState<{ start: string; end: string } | null>(null);
+  const [viewport, setViewport] = useState<{ start: string; end: string } | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('timeseries');
+
+  const debouncedViewport = useDebouncedValue(viewport, 300);
+
+  useEffect(() => {
+    if (debouncedViewport) {
+      // Bridge debounced viewport into the data-fetching key. This is a
+      // setState-in-effect by design: the effect's job is to translate one
+      // piece of React state (viewport, written from a Plotly callback) into
+      // another (timeRange, consumed by useViewportResampling) only after the
+      // user has settled on a range.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTimeRange(debouncedViewport);
+    }
+  }, [debouncedViewport]);
 
   const { data, loading, error } = useViewportResampling({
     entityId: selectedFlight,
@@ -39,6 +55,7 @@ export default function App() {
   const handleFlightSelect = (entityId: string, startTime: string, endTime: string) => {
     setSelectedFlight(entityId);
     setTimeRange({ start: startTime, end: endTime });
+    setViewport(null);
   };
 
   return (
@@ -113,7 +130,17 @@ export default function App() {
 
           {/* Chart */}
           {viewMode === 'timeseries' ? (
-            <FlightTimeSeries data={data} loading={loading} error={error} />
+            <FlightTimeSeries
+              data={data}
+              loading={loading}
+              error={error}
+              onViewportChange={(startMs, endMs) =>
+                setViewport({
+                  start: new Date(startMs).toISOString(),
+                  end: new Date(endMs).toISOString(),
+                })
+              }
+            />
           ) : (
             <FlightScatterPlot data={data} loading={loading} error={error} />
           )}
